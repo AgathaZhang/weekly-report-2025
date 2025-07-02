@@ -1,0 +1,24 @@
+0630
+
+**看Ucoslam源代码伤到了docker环境 直接只能重新import一个新image
+有一下两点注意:
+1 ucoslam2的3rdparty中可能在catkin_make的时候，或者从仓库拉下来的时候，其中存在build中间文件，被污染过，可以尝试重新docker cp干净的3rdparty
+2 如果要使用catkin build 而非 catkin_make 来编译必须使用
+			project(ucoslam LANGUAGES CXX C)，而不是project(ucoslam LANGUAGES CXX)
+
+
+0701
+
+**workspace 跳到cloud_mapping去了是因为无意间执行了:
+	cd /home/kilox/cloud_mapping
+	catkin init
+或者
+	catkin config --extend /opt/ros/noetic
+
+cd /home/kilox/cloud_mapping/src/ucoslam2	# 进入你要作为嵌套 workspace 的根目录
+catkin init				# 先初始化
+catkin config --source-space src	# 显式指定 source space
+catkin config --extend /opt/ros/noetic	# 再告诉它需要继承 noetic 的基础环境
+catkin config				# 检查配置
+catkin build --verbose			# 测试编译
+

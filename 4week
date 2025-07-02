@@ -1,0 +1,44 @@
+0626 
+
+**发现一个roslaunch，roscore不成功的问题，是由于rosmaster监听的11311端口被进程占用导致，sudo lsof -i :11311然后sudo kill -9 ID即可解决，下次在run docker时记住localhost
+
+docker run -it --net=host \
+  -e ROS_MASTER_URI=http://localhost:11311 \
+  -e ROS_HOSTNAME=localhost \
+  your_image_name
+  
+** 为了编译源码的形式安装rviz 添加了一个符号链接
+sudo ln -s /usr/lib/x86_64-linux-gnu/liborocos-kdl.so /usr/local/lib/liborocos-kdl.so
+sudo ln -s /usr/lib/x86_64-linux-gnu/liborocos-kdl.so.1.5.1 /usr/local/lib/liborocos-kdl.so
+
+
+0623
+
+**解决 Eigen3 编译时的对齐问题
+# add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY)  # 06.23 解决 Eigen3 编译时的对齐问题
+add_compile_definitions(
+  EIGEN_DONT_ALIGN_STATICALLY
+  EIGEN_DONT_VECTORIZE
+)
+
+
+0621
+
+**主要是对docker容器环境的一些适配调整，特别是对于4.2.0版本的opencv，解决了该低版本中cv::xfeatures2d::SIFT::create()函数报错问题。添加引入了双库编译后的.so文件以及指向了xfeatures2d.hpp，并注释了ucoslam源码库中_nOctaveLayers = 4;引用不详的问题，目前实测代码可跑
+
+在gridextractor.cpp中加入
+
+#include <opencv2/xfeatures2d.hpp> //self add 06.21 opencv xfeatures2d module
+#include <opencv2/xfeatures2d/nonfree.hpp>
+
+CMakeLists: add_definitions(-DXFEATURES2D)
+注释掉_nOctaveLayers=4; 未定义
+修改：
+// auto desc=cv::SIFT::create(gfeatures,param.nOctaveLevels,0.02,5,param.scaleFactor);  // 06.21
+auto desc=cv::xfeatures2d::SIFT::create(gfeatures,param.nOctaveLevels,0.02,5,param.scaleFactor);
+
+
+
+
+
+
