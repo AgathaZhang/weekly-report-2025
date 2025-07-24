@@ -1,0 +1,15 @@
+0714
+
+** 解决一个依赖编译顺序的bug, 找不到“Sophus.so”
+catkin build vikit_common -j4
+catkin build fast_livo -j8
+
+**
+1 如果你的 vikit_common 和 Sophus 在同一个包里，Sophus 必须在 CMakeLists.txt 里 add_subdirectory()
+并且先于后面所有 target_link_libraries
+2 如果 Sophus 是另一个包（不是同一个），那就得写 find_package(Sophus REQUIRED) 并用 catkin_package(CATKIN_DEPENDS Sophus) 来强制顺序
+
+
+docker cp ./Sophus vibrant_ucoslam:/store_agatha 
+Successfully copied 101kB to vibrant_ucoslam:/store_agatha
+

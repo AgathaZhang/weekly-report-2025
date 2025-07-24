@@ -22,3 +22,7 @@ catkin config --extend /opt/ros/noetic	# 再告诉它需要继承 noetic 的基�
 catkin config				# 检查配置
 catkin build --verbose			# 测试编译
 
+
+0702
+
+**如果现在使用的是基于特征点前端的slam算法，场景是在一个狭窄通道，摄像头离墙面很近，载具速度一快，可能使帧间overlap的效果下降，有鱼眼相机方案

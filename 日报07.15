@@ -1,0 +1,28 @@
+1️⃣ ORB 位姿要在什么时刻与 IMU/LiDAR 同步？
+2️⃣ 怎么把 ORB 位姿当作观测值，放进 stateEstimationAndMapping() 的滤波器里？
+
+📌 最小可行的浏览路线：
+✅ 1️⃣ 先看 sync_packages()
+目的：看它现在怎么收集 IMU、LiDAR、相机图像帧，
+
+你要决定：ORB 位姿是跟图像绑定还是单独生成？需要在这里同步插入，还是单独异步队列？
+
+✅ 2️⃣ 看 processImu()
+这步是预积分。
+
+你的 ORB 位姿不影响 IMU 预积分，但要保证它的时间戳在后面与状态对齐。
+
+✅ 3️⃣ 核心：看 stateEstimationAndMapping()
+这是 EKF 或紧耦合滤波的入口。
+
+重点是你要在这里增加一条观测：
+
+复制
+编辑
+X_{t} ≈ ORB 位姿
+在后端里，ORB 位姿要当成“外部视觉观测”，跟 IMU/LiDAR观测一致做状态约束。
+
+✅ 4️⃣ 找 handleFirstFrame()（只扫一遍）
+它只做首帧初始化，你只要保证第一次用 ORB 位姿时有合理初值，不用太纠结。
+
+

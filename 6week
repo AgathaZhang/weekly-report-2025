@@ -1,0 +1,8 @@
+0708
+
+**看Ucoslam源代码伤到了docker环境 直接只能重新import一个新image
+
+
+0711
+
+**roslaunch fast_livo mapping_mid360_2.launch bag_path:=/home/kilox/wutong/2025_05_02_03_23_12_0.bag loop_bag_path:=/home/kilox/wutong/loop_detect_0709/
