@@ -1,15 +1,27 @@
-0714
+0721
 
-** 解决一个依赖编译顺序的bug, 找不到“Sophus.so”
-catkin build vikit_common -j4
-catkin build fast_livo -j8
+** 解决Dev_ucoslam混编不同的opencv库的bug
+ ldd *.so | grep opencv
+ 最后在Dev_slam库的dependencies.cmake中设置了：
+ 
+ set(OpenCV_DIR "/usr/local/lib")            # 统一库07.24
+find_package(OpenCV 3.4.0 REQUIRED)         # 统一库07.24
 
-**
-1 如果你的 vikit_common 和 Sophus 在同一个包里，Sophus 必须在 CMakeLists.txt 里 add_subdirectory()
-并且先于后面所有 target_link_libraries
-2 如果 Sophus 是另一个包（不是同一个），那就得写 find_package(Sophus REQUIRED) 并用 catkin_package(CATKIN_DEPENDS Sophus) 来强制顺序
+最后在Dev_ucoslam主CMakeLists.txt中用include(cmake/dependencies.cmake)选择只用opencv3.4
 
 
-docker cp ./Sophus vibrant_ucoslam:/store_agatha 
-Successfully copied 101kB to vibrant_ucoslam:/store_agatha
+删去了诸如：
+target_include_directories(ucoslam PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../utils>
+  # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../basictypes>
+  # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../featureextractors>
+  # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../map_types>
+  # $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../optimization>
+  # 添加本地安装的 opencv_xfeatures2d 头文件路径
+  # /home/kilox/cloud_mapping/src/ucoslam2/3rdparty/comp/local_install/opencv_xfeatures2d/include
+)
 
+修改了：# 这里可能写法不对
+# IF(${OpenCV_VERSION} STRGREATER 3)
+IF(DEFINED OpenCV_VERSION AND OpenCV_VERSION VERSION_GREATER "3.0.0")

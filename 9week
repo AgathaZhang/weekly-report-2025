@@ -1,0 +1,16 @@
+0728
+
+**	<!--launch-prefix="gdb -ex run --args"/> -->
+	<!--launch-prefix="valgrind --leak-check=full"/> -->
+	
+0729 
+** ORB特征提取器崩溃问题待解决 
+      原因是没有初始化 std::shared_ptr<ucoslam::MarkerDetector> _mdetector;
+      本质是在Slam.setParams(TheMap, params, vocab_file_);没有调用这个语句 指针自然没有
+      
+      编译机制导致 输入格式导致 初始化参数接收导致
+      
+自动播包： 
+    <node pkg="rosbag" type="play" name="player" output="screen" args="--clock -r 0.1 -d 5 $(arg bag_path)"/>
+
+

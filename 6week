@@ -6,3 +6,12 @@
 0711
 
 **roslaunch fast_livo mapping_mid360_2.launch bag_path:=/home/kilox/wutong/2025_05_02_03_23_12_0.bag loop_bag_path:=/home/kilox/wutong/loop_detect_0709/
+
+0728
+**增加对ucoslam.launch的支持
+
+roslaunch fast_livo mapping_mid360_ucoslam.launch bag_path:=/home/kilox/wutong/agatha1.bag loop_bag_path:=/home/kilox/wutong/loop_detect_0709/
+
+// FIXME 通过平移量计算尺度比 用BCH逆变换映射到旋转R上去 这存在一个悖论: 尺度是相同，但两个系统的误差和噪声都不同，强行用平移P去求比例出来的 那把本来的误差抹掉了，
+    // 这个scale比例 是用平移量P的1dim 2dim 还是3dim呢？最后要求的 是R6上norm共同的最小化 
+  }

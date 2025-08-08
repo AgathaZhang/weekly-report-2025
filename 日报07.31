@@ -1,0 +1,23 @@
+关于双库合并eigen3对齐问题现象的整理： 
+
+1 外部fastlivo 不能开禁用对齐  因为IMU_processing.cpp 403行总会使用对齐的方式运作 
+     取消所有关于ucoslam的调用后，实测可以正常运行fastlivo
+     
+2 Dev_ucoslam 内外两个cmakelists，都加到禁用add_compile_definitions(),
+    在g2o/g2o/cmakelists加上  add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY -DEIGEN_DONT_VECTORIZE)
+  fastlivo运行uco_node->Slam.process() 会挂在globalOptimization();
+  
+3 Dev_ucoslam 内外两个cmakelists，都加到禁用add_definitions,
+    在g2o/g2o/cmakelists不加上  add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY -DEIGEN_DONT_VECTORIZE)
+  fastlivo运行uco_node->Slam.process() 会挂在globalOptimization();
+  
+4 Dev_ucoslam 内外两个cmakelists，都不加禁用也会报错
+  
+5 实验：(1)ucoslam2 这个包中debug模式下，eigen3对齐受ucoslam_node最外层的add_compile_definitions()禁用宏管理
+	会通过 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Dev_ucoslam ${CMAKE_BINARY_DIR}/Dev_ucoslam_build)
+	层层传递，最终影响到Dev_ucoslam
+	(2)全部取消禁止对齐，外层ucoslam_node 设置为release 保留add_compile_options(-g)，Dev_ucoslam里层两个 
+	cmakelists也设置成取消对齐，没有报错
+	(3)ucoslam2 ucoslam_node 设置成release + -g 内外部都不加禁止宏，也设置成release + -g 可以打断点并跑通
+	
+  

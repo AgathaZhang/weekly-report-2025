@@ -1,0 +1,127 @@
+void VIOManager::updateState2(cv::Mat increment_cv, SlamStatusMonitor* slam_status)    // 08.07
+{                                  /* Uco增量位姿*/
+  // FIXME 要不要做数据隔离 便于应用Uco丢失时的切换
+  MD(4,4) increment; // cv::Mat 转 Eigen::Matrix4d
+  increment(3,0)=increment(3,1)=increment(3,2)=0;increment(3,3)=1;
+  cv::cv2eigen(increment_cv, increment);
+  std::cout << "Increment Matrix: \n" << increment << std::endl;
+
+  /** 匿名函数声明*/
+  auto computeRelativeLog = [](
+    const Eigen::Matrix4d& inc,
+    const Eigen::Matrix4d& state_inc
+    ) -> MD(6,1)
+    {
+        // 1) 拆分增量矩阵
+        Eigen::Matrix3d R_inc = inc.block<3,3>(0,0);
+        Eigen::Vector3d t_inc = inc.block<3,1>(0,3);
+
+        // 2) 拆分状态增量矩阵
+        Eigen::Matrix3d R_state = state_inc.block<3,3>(0,0);
+        Eigen::Vector3d t_state = state_inc.block<3,1>(0,3);
+
+        // 3) 用旋转和平移构造 SE3
+        Sophus::SE3 A(R_inc, t_inc);
+        Sophus::SE3 B(R_state, t_state);
+
+        // 4) 计算相对变换并做 Log 映射
+        Sophus::SE3 lie_delta = A.inverse() * B;
+        return lie_delta.log();  // 本身就是 double 精度，无需再 cast
+    };
+  
+  auto computeResAndJac = [](
+    const SE3 &T_uco, const SE3 &T_lio) -> std::pair<MD(6,1),MD> 
+  {
+
+    SE3 e = T_uco.inverse() * T_lio;              // 误差变换 e = T_uco⁻¹ * T_lio
+    MD(6,1) r = e.log();                          // 残差 r = log(e)
+    MD(6,6) J_log = SE3::Dx_log(r);               // 左雅可比：d(Log(X))/dX|_{X=e}
+    MD(6,6) Ad_inv_uco = T_uco.inverse().Adj();    // Adjoint( T_uco⁻¹ )
+    MD(6,6) H = J_log * Ad_inv_uco;                // 雅可比 H = J_log * Ad_inv_uco
+
+    return {r, H};
+  };
+
+  if (fore_state.empty()) return; // FIXME 
+
+  StatesGroup save_old_state = (*state);                // 保存当前状态的副本，用于回滚
+  
+  VectorXd z;                                           // 残差向量
+  MatrixXd H_sub;                                       // 雅可比矩阵
+  bool EKF_end = false;                                 // 标志是否结束 EKF 优化
+  float last_error = std::numeric_limits<float>::max(); // 记录上一次的误差
+
+  const int H_DIM = 6; // 观测模型的维度（残差维度）这里假设只有一个测量维度 pose_graph 用于构建雅可比矩阵 H_sub 和残差向量 z
+  z.resize(H_DIM);                                              // 调整残差向量长度
+  z.setZero();                                                  // 残差向量置零
+  H_sub.resize(H_DIM, 6);                                       // 雅可比矩阵行 = H_DIM，列 = 状态维度（6）n*6
+  H_sub.setZero();                                              // 雅可比矩阵置零
+
+    /** step3 取LIO相对位姿*/
+  M3D Rwi(state->rot_end);
+  V3D Pwi(state->pos_end);
+  M3D fore_Rwi(fore_state->rot_end);
+  V3D fore_Pwi(fore_state->pos_end);
+  
+  M3D state_increment_R = fore_Rwi.transpose() * Rwi;                   // 相对变换公式
+  V3D state_increment_t = fore_Rwi.transpose() * (Pwi - fore_Pwi);
+  MD(4,4) state_increment;                                              // 封装回去
+  state_increment.block<3,3>(0,0) = state_increment_R;
+  state_increment.block<3,1>(0,3) = state_increment_t;
+  // std::cout << "State Increment Matrix: \n" << state_increment << std::endl;
+
+  if(!Uco_scale){
+    // FIXME 通过平移量计算尺度比 用BCH逆变换映射到旋转R上去 这存在一个悖论: 
+    // 尺度是相同，但两个系统的误差和噪声都不同，强行用平移P去求比例出来的 那把本来的误差抹掉了，
+    // 这个scale比例 是用平移量P的1dim 2dim 还是3dim呢？最后要求的 是R6上norm共同的最小化 
+  }
+
+  /** step2 下降迭代*/
+  for (int iteration = 0; iteration < max_iterations/*两次迭代够了max_iterations*/; iteration++)
+  {
+
+    float error = 0.0;                                     /** 当前迭代的 累积误差*/
+    Sophus::SE3 T_state_inc(state_increment.block<3,3>(0,0), state_increment.block<3,1>(0,3));
+    Sophus::SE3 T_uco_inc(increment.block<3,3>(0,0), increment.block<3,1>(0,3));
+    /** step4 计算相对变换的对数映射 r = log(Tuco⁻¹ ⋅ Tlio) 构建残差z*/
+    auto [residual, jacobian] = computeResAndJac(T_uco_inc, T_state_inc);
+    // std::pair<MD(6,1),MD(6,6)> [z, H_sub] = computeResAndJac(increment, state_increment);
+    z = residual;
+    H_sub = jacobian;
+    error = z.norm();                                           // 计算当前李代数上的二范数误差
+    std::cout << "Iteration " << iteration << ", Error: " << error << std::endl; 
+
+    /** ekf阶段 更新残差和雅可比 */
+    if (error <= last_error)                                    // 若误差变小，接受这次更新
+    {
+      old_state = (*state);                                     // 更新备份状态
+      last_error = error;                                       // 更新最小误差
+
+      auto &&H_sub_T = H_sub.transpose();                       // 转置雅可比
+      H_T_H.setZero();                                          // 清零 H^T*H
+      G.setZero();                                              // 清零 G 矩阵
+      H_T_H.block<6,6>(0,0) = H_sub_T * H_sub;                  // 计算 H^T*H  (R | t | I)^T * (R | t | I)
+      MD(DIM_STATE, DIM_STATE) &&K_1 = (H_T_H + (state->cov / img_point_cov).inverse()).inverse(); // 计算增益K中间矩阵
+      auto &&HTz = H_sub_T * z;                                 // 计算 H^T*z 7*1    H^T为 (R | t | I) 7*n   z为 n*1维列向量
+      auto vec = (*state_propagat) - (*state);                 // 先验偏差向量
+      G.block<DIM_STATE, 6>(0, 0) = K_1.block<DIM_STATE, 6>(0, 0) * H_T_H.block<6, 6>(0, 0);    // G = 卡尔曼增益K * 协方差
+      MD(DIM_STATE, 1) solution;
+      solution = -K_1.block<DIM_STATE, 6>(0, 0) * HTz + vec - G.block<DIM_STATE, 6>(0, 0) * vec.block<6, 1>(0, 0);  // 计算状态增量
+      // 解 = -k1(前7维19*7)*HTz(误差在梯度上的投影7*1) + vec先验偏差 - k1*协方差（G前7维)*vec(前7维)
+      (*state) += solution;                                     // 更新状态
+      auto &&rot_add = solution.block<3,1>(0,0);                // 提取旋转量
+      auto &&t_add = solution.block<3,1>(3,0);                  // 提取平移量
+      // 终止条件：旋转<0.001° 且 平移<1cm
+      if ((rot_add.norm() * 57.3f < 0.001f) &&
+          (t_add.norm() * 100.0f < 0.001f))
+        EKF_end = true;
+    }
+    else                                                        // 若误差变大，回滚
+    {
+      (*state) = old_state;                                     // 回滚状态
+      EKF_end = true;                                           // 强制结束迭代
+    }
+    if (iteration == max_iterations || EKF_end) break;          // 达到最大迭代或结束标志就退出
+  }
+}
+
