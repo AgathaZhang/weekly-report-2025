@@ -1,0 +1,5 @@
+08.18
+gdb 堆栈方式
+<!-- <node pkg="fast_livo" type="fastlivo_mapping" name="laserMapping" output="screen" launch-prefix="gdb -ex run --args"> -->
+
+	<!-- <node pkg="fast_livo" type="fastlivo_mapping" name="laserMapping" output="screen" launch-prefix="gdb -ex run --args"> -->

@@ -16,8 +16,7 @@
 5 实验：(1)ucoslam2 这个包中debug模式下，eigen3对齐受ucoslam_node最外层的add_compile_definitions()禁用宏管理
 	会通过 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../Dev_ucoslam ${CMAKE_BINARY_DIR}/Dev_ucoslam_build)
 	层层传递，最终影响到Dev_ucoslam
-	(2)全部取消禁止对齐，外层ucoslam_node 设置为release 保留add_compile_options(-g)，Dev_ucoslam里层两个 
-	cmakelists也设置成取消对齐，没有报错
-	(3)ucoslam2 ucoslam_node 设置成release + -g 内外部都不加禁止宏，也设置成release + -g 可以打断点并跑通
+	(2)全部取消禁止对齐，外层ucoslam_node 设置为release 保留add_compile_options(-g)，Dev_ucoslam里层两个 cmakelists也设置成取消禁止对齐，没有报错
+	(3)ucoslam2 ucoslam_node 设置成release + -g Dev内外部都不加禁止宏，也设置成release + -g 可以打断点并跑通
 	
   
